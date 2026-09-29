@@ -24,6 +24,7 @@ import actionAddS3 from "../src/tools/add-s3.ts"
 import actionAddSecret from "../src/tools/add-secret.ts"
 import actionAddRedis from "../src/tools/add-redis.ts"
 import actionNew from "../src/tools/new.ts"
+import actionRequirements, { parseRuntimeRequirements, runtimeLibraries } from "../src/tools/requirements.ts"
 import { endpointArg, parseEndpoint } from "../src/lib.ts"
 import authSetup from "../src/tools/auth-setup.ts"
 import secretBind from "../src/tools/secret-bind.ts"
@@ -183,13 +184,14 @@ test("existing tools expose validation failures as MCP errors", () => {
   })
 })
 
-test("action_add_redis installs its runtime dependency and migrates text responses", () => {
+test("action_add_redis relies on the runtime's redis and migrates text responses", () => {
   inTemporaryProject(() => {
     endpoint("v1/cache")
 
     const first = actionAddRedis.handler({ endpoint: "v1/cache" })
     assert.equal(first.isError, undefined)
-    assert.equal(readFileSync("packages/v1/cache/requirements.txt", "utf-8"), "redis\n")
+    assert.equal(existsSync("packages/v1/cache/requirements.txt"), false)
+    assert.match(resultText(first), /'redis' is preinstalled/)
     assert.match(
       readFileSync("packages/v1/cache/__main__.py", "utf-8"),
       /redis\.from_url\(.+decode_responses=True\)/,
@@ -199,8 +201,8 @@ test("action_add_redis installs its runtime dependency and migrates text respons
 
     const repeated = actionAddRedis.handler({ endpoint: "v1/cache" })
     assert.equal(repeated.isError, undefined)
-    assert.match(resultText(repeated), /already in requirements\.txt/)
-    assert.equal(readFileSync("packages/v1/cache/requirements.txt", "utf-8"), "redis\n")
+    assert.match(resultText(repeated), /'redis' is preinstalled/)
+    assert.equal(existsSync("packages/v1/cache/requirements.txt"), false)
   })
 })
 
@@ -223,7 +225,7 @@ test("auth_setup atomically wires Redis to the complete authentication surface",
 
     for (const name of ["register", "login", "me", "employees", "logout"]) {
       assert.match(readFileSync(`packages/v1/${name}/__main__.py`, "utf-8"), /def init_redis/)
-      assert.equal(readFileSync(`packages/v1/${name}/requirements.txt`, "utf-8"), "redis\n")
+      assert.equal(existsSync(`packages/v1/${name}/requirements.txt`), false)
     }
   })
 })
@@ -314,5 +316,35 @@ test("action_new reports incompatible existing paths as MCP errors", () => {
     const visibilityConflict = actionNew.handler({ endpoint: "v1/private-action", public: true })
     assert.equal(visibilityConflict.isError, true)
     assert.match(resultText(visibilityConflict), /requested public=true/)
+  })
+})
+
+test("runtime libraries come from the vendored runtime requirements.txt", () => {
+  const libraries = runtimeLibraries()
+  for (const name of ["requests", "redis", "pyyaml", "python-dotenv", "psycopg", "kafka-python", "bcrypt"]) {
+    assert.ok(libraries.includes(name), name)
+  }
+  for (const name of ["pillow", "scikit-learn", "lightgbm", "scrapy", "pyjwt"]) {
+    assert.ok(!libraries.includes(name), name)
+  }
+  assert.deepEqual(
+    parseRuntimeRequirements("# c\n-r base.in\nPsycopg[binary]==3.3.5\n    # via x\nTyping_Extensions==4\n"),
+    ["psycopg", "typing-extensions"],
+  )
+})
+
+test("action_requirements accepts runtime libraries and refuses anything else", () => {
+  inTemporaryProject(() => {
+    endpoint("v1/login")
+
+    const shipped = actionRequirements.handler({ endpoint: "v1/login", library: "Kafka_Python" })
+    assert.equal(shipped.isError, undefined)
+    assert.match(resultText(shipped), /preinstalled/)
+
+    const missing = actionRequirements.handler({ endpoint: "v1/login", library: "Pillow" })
+    assert.equal(missing.isError, true)
+    assert.match(resultText(missing), /not available in the OpenServerless Python runtime/)
+    assert.match(resultText(missing), /Implement it in code/)
+    assert.equal(existsSync("packages/v1/login/requirements.txt"), false)
   })
 })
