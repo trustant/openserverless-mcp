@@ -284,8 +284,8 @@ def init_redis(args, ctx):
 builder.append(init_redis)
 ```
 
-The tool must also add `redis` to the endpoint `requirements.txt`, because the
-default Python action runtime does not guarantee that client library. Repeated
+The tool checks `redis` with `action-requirements`; the Python action runtime
+ships it, so no endpoint `requirements.txt` is written. Repeated
 calls are idempotent and upgrade an existing generated Redis connector to
 `decode_responses=True` so action results contain JSON-safe strings rather than
 raw bytes.
@@ -401,38 +401,16 @@ Receive an <endpoint> (`name` or `package/name`) and a <library> name.
 
 ## generation
 
-The tool will do nothing when one of the following libraries is required (use the available version), otherwise will add the library to the file
+The available libraries are the ones installed in the OpenServerless Python 3.12
+action runtime, read at runtime from the verbatim copy of its
+[requirements.txt](https://raw.githubusercontent.com/trustable-ai/openserverless-runtimes/refs/heads/0.9.0/runtime/python/v3.12/requirements.txt)
+vendored at the package root as `requirements.txt`. Every pinned line counts
+(direct and transitive), compared by PEP 503-normalized name.
 
-packages/<package>/<name>/requirements.txt
+- A library in that list: do nothing and report it as available.
+- Any other library: return an error saying it is not available in the runtime
+  and must be implemented in code with the standard library and the runtime
+  libraries. New requirements are never allowed.
 
-- requests
-- ollama
-- openai
-- pymilvus
-- redis
-- pyyaml
-- boto3
-- psycopg
-- beautifulsoup4
-- pillow
-- nltk
-- httplib2
-- kafka_python
-- python-dateutil
-- scrapy
-- simplejson
-- twisted
-- netifaces
-- pymongo
-- minio
-- langdetect
-- plotly
-- joblib
-- lightgbm
-- feedparser
-- numpy
-- scikit-learn
-- langchain
-- langchain-ollama
-- langchain-openai
-- bcrypt
+The tool never writes `packages/<package>/<name>/requirements.txt`. A missing
+or empty vendored file is a hard error.
