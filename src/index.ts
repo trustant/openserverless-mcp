@@ -28,7 +28,6 @@ import actionAddS3 from "./tools/add-s3.ts"
 import actionAddPostgresql from "./tools/add-postgresql.ts"
 import actionAddRedis from "./tools/add-redis.ts"
 import actionAddMilvus from "./tools/add-milvus.ts"
-import actionAddMongodb from "./tools/add-mongodb.ts"
 import secretStatus from "./tools/secret-status.ts"
 import secretBind from "./tools/secret-bind.ts"
 import secretUnbind from "./tools/secret-unbind.ts"
@@ -43,7 +42,6 @@ const tools: Tool[] = [
   actionAddPostgresql,
   actionAddRedis,
   actionAddMilvus,
-  actionAddMongodb,
   secretStatus,
   secretBind,
   secretUnbind,
