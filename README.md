@@ -20,7 +20,11 @@ Model Context Protocol so any MCP-capable agent can drive them.
 | `action_add_postgresql` | Add PostgreSQL (`ctx.POSTGRESQL`). |
 | `action_add_redis` | Add Redis (`ctx.REDIS`, `ctx.REDIS_PREFIX`) and its Python runtime dependency; use it for opaque authenticated sessions. |
 | `action_add_milvus` | Add Milvus vector DB (`ctx.MILVUS`). |
-| `action_add_mongodb` | Add MongoDB (`ctx.MONGODB_CLIENT`, `ctx.MONGODB`). |
+
+There is no MongoDB tool: Trustant never uses MongoDB. Store document data in
+PostgreSQL `JSONB` (`action_add_postgresql`) and use Redis for cache, sessions
+and simple key-value data. `pymongo` is not in the vendored runtime
+`requirements.txt`, so `action_requirements` refuses it.
 
 The `endpoint` argument is either `name` (uses the `v1` package) or
 `package/name`. Both segments must start with a letter and contain only letters,
@@ -72,7 +76,6 @@ src/
     add-postgresql.ts action_add_postgresql
     add-redis.ts      action_add_redis
     add-milvus.ts     action_add_milvus
-    add-mongodb.ts    action_add_mongodb
     secret-status.ts  secret_status
     secret-bind.ts    secret_bind
     secret-unbind.ts  secret_unbind
